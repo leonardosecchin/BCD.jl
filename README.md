@@ -9,7 +9,7 @@ unconstrained optimization under Hölder continuity. 2026
 
 ## Installation and use
 
-`]add https://github.com/leonardosecchin/BCD.git`
+`]add https://github.com/leonardosecchin/BCD`
 
 For usage instructions, type `?bcd` after load the package `BCD`. If HSL MA57 is
 installed, it is used; otherwise, linear systems are solved by Julia's built-in

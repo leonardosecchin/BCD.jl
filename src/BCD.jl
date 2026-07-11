@@ -36,20 +36,25 @@ function `B` that returns the sparse partial Hessian approximation, and the
 function `data_init` that initializes problem-specific structures. Their headers
 should be:
 
-`function f(x, blocks::Vector{Block}, bid, data)`\\
-`function g!(g, x, blocks::Vector{Block}, bid, data)`\\
-`function B(x, blocks::Vector{Block}, bid, data)`\\
+`function f(s, blocks::Vector{Block}, bid, data)`\\
+`function g!(g, blocks::Vector{Block}, bid, data)`\\
+`function B(blocks::Vector{Block}, bid, data)`\\
 `function data_initialize(x, blocks::Vector{Block})`
 
 where `x` is the full vector of variables, `bid` is the block index and `data`
 is a `struct` with all necessary stuff for the problem, defined by the user.
 In the function `g!`, `g` is the full gradient and the partial gradient, whose
 entries associated with block index `bid` receive the corresponding partial
-gradient at `x`. Function `f` should return a `Float64`, function `B!` should
-return the matrix `B` in sparse format, and `data_initialize` the structure
-`data` initialized at `x`. Only lower triangle of `B` should be provided. Note
-that fields in `data` are modified during the method, so it must be `mutable`
-if it contains numeric fields.
+gradient at the current point. Function `f` should return a `Float64`, function
+`B!` should return the matrix `B` in sparse format, and `data_initialize` the
+structure `data` initialized at `x`. Only lower triangle of `B` should be
+provided. Note that fields in `data` are modified during the method, so it must
+be `mutable` if it contains numeric fields.
+
+It is important to note that `f` receives the partial direction `s`, that is,
+the vector of components of `x+ - x` in the block `i`, where `x+` is the point
+`x` after a step w.r.t. the block `i`. The functions `g!` and `B` do not receive
+`x`; if needed, the current point must be stored as a property of `data`.
 
 `output` is a `IterInfo` structure that contains information about the
 resolution process. In particular, `output.x` is the final iterate and
@@ -188,8 +193,8 @@ function bcd(
     bid = 0
 
     # evaluate f at the initial point
-    # data is up to date, so we can evaluated it w.r.t. any block
-    iter.f = f(iter.x, blocks, 1, data)
+    # data is up to date regarding the current point, so we pass block id 0
+    iter.f = f([], blocks, 0, data)
     iter.nf += 1
 
     @inbounds lastf[1] = iter.f
@@ -269,7 +274,7 @@ function bcd(
             bid = user_blk(blocks, bid, eligible_blks, opts)
 
             # compute partial grad f
-            g!(g, iter.x, blocks, bid, data)
+            g!(g, blocks, bid, data)
             iter.ng += 1
 
             @views opts[bid] = norm(g[blocks[bid].idx], Inf)
@@ -305,7 +310,7 @@ function bcd(
 
         # compute B
         # only the lower triangle of B must be given
-        Bi = B(iter.x, blocks, bid, data)
+        Bi = B(blocks, bid, data)
         iter.nB += 1
 
         if isempty(Bi)
@@ -407,7 +412,7 @@ function bcd(
             @views @. xtrial[blocks[bid].idx] = xi + si
 
             # descent condition
-            ftrial = f(xtrial, blocks, bid, data)
+            ftrial = f(si, blocks, bid, data)
             iter.nf += 1
 
             dec = user_dec(E, S, iter, par)

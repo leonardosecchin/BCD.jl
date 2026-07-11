@@ -15,12 +15,12 @@ fmt_lf1 = generate_formatter("%5.1lf")
 fmt_e = generate_formatter("%8.2e")
 fmt_etex(v) = replace(fmt_e(v), "e+" => "e\$+\$", "e-" => "e\$-\$")
 
-function lplsq_table(; run_id = 0, target_ni = 10.0)
+function lplsq_table(; run_id = 0, nb = 10.0)
     results = jld2_read("results.jld2", "results")
     if isnothing(results)
         return
     end
-    results = results[(results.run_id .== run_id) .& (results.target_ni .== target_ni),:]
+    results = results[(results.run_id .== run_id) .& (results.nb .== nb),:]
 
     tex = open("lp-lsq_results.tex", "w")
     write(tex, "\\begin{tabular*}{\\textwidth}{@{\\extracolsep\\fill}lcccrrr}\n\\toprule\n")
@@ -28,7 +28,7 @@ function lplsq_table(; run_id = 0, target_ni = 10.0)
     for r in eachrow(results)
         name = replace(basename(string(r.instance)), "_" => "\\_")
         it = (r.gsupn > 1e-3) ? "\\it " : ""
-        write(tex, "\\texttt{$(name)} & ($(fmt_d(r.size[1])); $(fmt_d(r.size[2]))) & $(fmt_lf1(target_ni*r.size[2]/100)) & $(it)$(fmt_d(r.iter)) & $(it)$(fmt_etex(r.f)) & $(it)$(fmt_etex(r.gsupn)) & $(it)$(fmt_lf(r.time)) \\\\ \n")
+        write(tex, "\\texttt{$(name)} & ($(fmt_d(r.size[1])); $(fmt_d(r.size[2]))) & $(fmt_lf1(nb*r.size[2]/100)) & $(it)$(fmt_d(r.iter)) & $(it)$(fmt_etex(r.f)) & $(it)$(fmt_etex(r.gsupn)) & $(it)$(fmt_lf(r.time)) \\\\ \n")
     end
     write(tex, "\\bottomrule\n\\end{tabular*}")
     close(tex)
@@ -47,9 +47,9 @@ function BenchmarkProfiles.powertick(s::AbstractString)
     return s
 end
 
-function pp_blk(; target_ni = 10.0, runs = [0;1], p = 1.5)
+function pp_blk(; nb = 10.0, runs = [0;1], p = 1.5)
     results = jld2_read("results.jld2","results")
-    results = results[(results.target_ni .== target_ni) .& (results.p .== p),:]
+    results = results[(results.nb .== nb) .& (results.p .== p),:]
 
     results[results.st .!= 0,:iter] .= -1
 
@@ -74,24 +74,24 @@ function pp_blk(; target_ni = 10.0, runs = [0;1], p = 1.5)
     Plots.savefig(fig, "pp_blk_iter.pdf")
 end
 
-function pp_S(; target_ni = 10.0)
+function pp_S(; nb = 10.0)
     results = jld2_read("results.jld2","results")
-    results = results[(results.run_id .== 0) .& (results.p .== 1.5) .& (results.target_ni .== target_ni),:]
+    results = results[(results.run_id .== 0) .& (results.p .== 1.5) .& (results.nb .== nb),:]
 
     results[results.st .!= 0,:time] .= Inf
     results[results.st .!= 0,:iter] .= -1
 
-    S = sort(unique(results[:,:target_ni]))
+    S = sort(unique(results[:,:nb]))
     times = []
     iters = []
     labels = String[]
     for ni in S
         if isempty(times)
-            times = results[results.target_ni .== ni,:time]
-            iters = Float64.(results[results.target_ni .== ni,:iter])
+            times = results[results.nb .== ni,:time]
+            iters = Float64.(results[results.nb .== ni,:iter])
         else
-            times = hcat(times, results[results.target_ni .== ni,:time])
-            iters = hcat(iters, Float64.(results[results.target_ni .== ni,:iter]))
+            times = hcat(times, results[results.nb .== ni,:time])
+            iters = hcat(iters, Float64.(results[results.nb .== ni,:iter]))
         end
         push!(labels, "$(fmt_lf1(ni))%")
     end

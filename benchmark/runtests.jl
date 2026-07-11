@@ -75,11 +75,20 @@ function download_matrices()
 end
 
 function solve(
-    A, b; nb = 10, verbose = 1, p = 1.5, usemetis = false, x0 = [], user_blk = blk_cyclic
+    A, b;
+    q = 10,
+    p = 1.5,
+    usemetis = false,
+    x0 = [],
+    user_blk = blk_cyclic,
+    user_dec = user_dec,
+    verbose = 1
 )
     @assert length(b) == size(A,1) "Dimensions mismatch"
 
     n = size(A, 2)
+
+    D = max(1.0/norm(A,2)^2, 10^3)
 
     # function to allocate and initialize data
     function data_initialize(x, bs)
@@ -126,10 +135,15 @@ function solve(
     function B(bs, i, data)
         @inbounds ni = bs[i].ni
         @inbounds if p == 2.0
-            return transpose(data.A[i]) * data.A[i] #+ 1e-6*spdiagm(ni, ni, ones(ni))
+            return transpose(data.A[i]) * data.A[i]
         else
-            return (p-1)*transpose(data.A[i]) * spdiagm(min.(abs.(data.Axb).^(p-2), 10^3)) * data.A[i] #+ 1e-6*spdiagm(ni, ni, ones(ni))
+            return (p-1)*transpose(data.A[i]) * spdiagm(min.(abs.(data.Axb).^(p-2), D)) * data.A[i]
         end
+    end
+
+    function Id(bs, i, data)
+        @inbounds ni = bs[i].ni
+        @inbounds spdiagm(ni, ni, ones(ni))
     end
 
     if usemetis
@@ -140,23 +154,23 @@ function solve(
         bl_idx = Vector{Int64}(undef, n)
 
         # consecutive blocks with balanced size
-        len, inc = divrem(n, nb)
+        len, inc = divrem(n, q)
         start = 1
         for i in 1:inc
             bl_idx[start:(start + len)] .= i
             start += len + 1
         end
-        for i in (inc + 1):nb
+        for i in (inc + 1):q
             bl_idx[start:(start + len - 1)] .= i
             start += len
         end
     end
-    blocks = create_blocks(nb, bl_idx)
+    blocks = create_blocks(q, bl_idx)
 
     par = default_params()
     par.eps = 1e-3
     par.alpha = 1e-4
-    par.maxit = max(5000, 100 * nb)
+    par.maxit = max(5000, 100 * q)
     par.maxfnoimpr = ceil(Int64, par.maxit/5)
 
     time = @elapsed output = bcd(
@@ -171,7 +185,12 @@ function solve(
 end
 
 function run_tests(;
-    p = 1.5, target_ni = 10.0, run_id = 0, usemetis = false, user_blk = user_blk
+    p = 1.5,
+    nb = 0.5,
+    run_id = 0,
+    usemetis = false,
+    user_blk = blk_cyclic,
+    user_dec = dec_min
 )
     outfile = "results.jld2"
 
@@ -185,9 +204,11 @@ function run_tests(;
             "run_id" => Int64[]
             "instance" => String[]
             "size" => []
-            "target_ni" => Float64[]
+            "nb" => Float64[]
             "nblocks" => Int64[]
             "p" => Float64[]
+            "blk" => String[]
+            "dec" => String[]
             "f" => Float64[]
             "gsupn" => Float64[]
             "st" => []
@@ -210,15 +231,19 @@ function run_tests(;
     end
 
     for P in eachrow(problems)
-        nb = ceil(Int64, 100.0/target_ni)
+        # desired number of vars per block: ni = n * (nb/100)
+        # number of blocks: q = n / ni = 100 / nb
+        q = ceil(Int64, 100 / nb)
 
-        print("Instance $(P.name), ni = $(target_ni), p = $(p)")
+        print("Instance $(P.name), nb = $(nb)%, p = $(p)")
         if !isempty(
             results[
             (results.run_id .== run_id) .&
             (results.instance .== P.name) .&
-            (results.nblocks .== nb) .&
-            (results.p .== p),:]
+            (results.nb .== nb) .&
+            (results.p .== p) .&
+            (results.blk .== String(nameof(user_blk))) .&
+            (results.dec .== String(nameof(user_dec))),:]
         )
             println(" -- already executed")
             continue
@@ -228,15 +253,29 @@ function run_tests(;
         try
             out, time = solve(
                 P.A, P.b;
-                nb = nb,
+                q = q,
                 user_blk = user_blk,
+                user_dec = user_dec,
                 usemetis = usemetis,
                 p = p,
                 verbose = 0
             )
 
-            row = [run_id; P.name; size(P.A); target_ni; nb;
-                p; out.f; out.opt; out.status; out.iter; time; out
+            row = [
+                run_id;
+                P.name;
+                size(P.A);
+                nb;
+                q;
+                p;
+                String(nameof(user_blk));
+                String(nameof(user_dec));
+                out.f;
+                out.opt;
+                out.status;
+                out.iter;
+                time;
+                out
             ]
             push!(results, (row))
 
@@ -248,15 +287,16 @@ function run_tests(;
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
+    # nb = desired number of variables per block (% of variables)
+
     # Cyclic selection
     println("Cyclic selecion...")
-    for ni in [0.5;1.0;5.0;10.0;15.0;20.0]
-        run_tests(target_ni = ni, user_blk = blk_cyclic)
+    for nb in [0.5;1.0;5.0;10.0;15.0;20.0]
+        run_tests(nb = nb, user_blk = blk_cyclic, user_dec = dec_min)
     end
-
-    # Cyclic selection with Metis
-    println("Cyclic selection with Metis...")
-    run_tests(target_ni = 10.0, run_id = 1, usemetis = true, user_blk = blk_cyclic)
+    for nb in [0.5;1.0;5.0;10.0;15.0;20.0]
+        run_tests(nb = nb, user_blk = blk_cyclic, user_dec = dec_max)
+    end
 
     # Results
     println("Compiling results...")

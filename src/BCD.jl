@@ -78,7 +78,7 @@ resolution process. In particular, `output.x` is the final iterate and
 
 - `par`: parameter structure `Param`
 - `x0`: initial guess (default `empty`)
-- `user_f`: descent criterion (default `dec_min`)
+- `user_dec`: descent criterion (default `dec_min`)
 - `user_blk`: function for selecting the block (default `blk_random`)
 - `user_callback`: user-defined callback function (default `nothing`)
 - `seed`: random seed (<0 for any; default `-1`)

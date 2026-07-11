@@ -5,9 +5,9 @@ Structure for iteration information.
 
 - `iter    :: Int64`: number of iterations
 - `status  :: Int64`: exit flag (type `?bcd` for details)
-- `x       :: Vector{Float64}`: final iterate
-- `f       :: Float64`: objective value at the final iterate
-- `sig     :: Float64`: final penalization parameter
+- `x       :: Vector{Float64}`: iterate
+- `f       :: Float64`: objective value
+- `sig     :: Float64`: penalization parameter
 - `opt     :: Float64`: maximum supnorm over all partial gradients
 - `nf      :: Int64`: number of evaluations of the objective function
 - `ng      :: Int64`: number of evaluations of the partial gradients
@@ -25,6 +25,21 @@ mutable struct IterInfo
     nB      ::Int64
 end
 
+"""
+Structure for parameters.
+
+## Fields
+
+- `eps       ::Float64`: optimality tolerance
+- `alpha     ::Float64`: line search parameter
+- `theta     ::Float64`: inexactness level allowed when computing directions
+- `maxit     ::Int64`: maximum number of iterations allowed
+- `sig0      ::Float64`: initial penalization
+- `fest      ::Float64`: stop if objective function value ≤ `fest`
+- `maxsig    ::Float64`: maximum penalization allowes
+- `maxfnoimpr::Int64`: maximum number of consecutive iterations without
+  improvement allowed
+"""
 mutable struct Param
     eps       ::Float64
     alpha     ::Float64
@@ -55,26 +70,4 @@ function consec_range(v::Vector{Int64})
             return v
         end
     end
-end
-
-# eigenvalue decomposition of a 2x2 symmetric, nondiagonal,
-# matrix D = A[k:k+1,k:k+1]
-function eigfac!(d, Q, A, k)
-    # A = [a b]
-    #     [b c]
-    @inbounds a, b, c = A[k,k], A[k,k+1], A[k+1,k+1]
-
-    sub = k:(k+1)
-
-    # eigenvalues
-    t = (a + c)/2
-    s = sqrt(((a - c)/2.0)^2 + b^2)
-    λ = max(0.0, t - s)
-    d[sub] .= [λ; max(0.0, t + s)]
-
-    # matrix of eigenvectors
-    v1 = [λ - c; b]
-    normalize!(v1, 2)
-    Q[sub,k] .= v1
-    Q[sub,k+1] .= [-v1[2]; v1[1]]
 end

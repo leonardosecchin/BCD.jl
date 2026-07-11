@@ -52,8 +52,7 @@ matrices = [
 struct DATA
     A::Vector{SparseMatrixCSC{Float64, Int64}}
     Axb::Vector{Float64}
-    Axi::Vector{Vector{Float64}}
-    Axtmp::Vector{Float64}
+    Asi::Vector{Float64}
     B::Vector{SparseMatrixCSC{Float64, Int64}}
     b::Vector{Float64}
 end
@@ -87,47 +86,44 @@ function solve(
         data = DATA(
             SparseMatrixCSC{Float64, Int64}[],
             zeros(length(b)),
-            Vector{Float64}[],
             Vector{Float64}(undef, size(A,1)),
             SparseMatrixCSC{Float64, Int64}[],
             b
         )
-        for i in 1:length(bs)
+        @inbounds for i in eachindex(bs)
             push!(data.A, sparse(A[:,bs[i].idx]))
-            push!(data.Axi, data.A[i] * x[bs[i].idx])
+            data.Axb .+= data.A[i] * x[bs[i].idx]
             push!(data.B, tril(transpose(data.A[i]) * data.A[i]))
             dropzeros!(data.B[end])
-        end
-        for j in 1:length(bs)
-            data.Axb .+= data.Axi[j]
         end
         data.Axb .-= data.b
         return data
     end
 
     # f(x) = 1/p |Ax - b|_p^p
-    function f(x, bs, i, data)
-        @inbounds begin
-            # compute Ai * xi
-            data.Axtmp .= data.Axi[i]
-            @views data.Axi[i] .= data.A[i] * x[bs[i].idx]
+    # i = 0 indicates that data.Axb is up to date, so we compute the p-norm
+    # directly
+    function f(s, bs, i, data)
+        if (i > 0)
+            # compute Ai * s
+            @inbounds data.Asi .= data.A[i] * s
             # update A*x - b
-            @. data.Axb += data.Axi[i] - data.Axtmp
+            @. data.Axb += data.Asi
         end
         return (1/p) * norm(data.Axb, p)^p
     end
 
     # partial gradient
-    function g!(g, x, bs, i, data)
-        if p == 2.0
-            @inbounds @views g[bs[i].idx] .= transpose(data.A[i]) * data.Axb
+    function g!(g, bs, i, data)
+        @inbounds @views if p == 2.0
+            g[bs[i].idx] .= transpose(data.A[i]) * data.Axb
         else
-            @inbounds @views g[bs[i].idx] .= transpose(data.A[i]) * (abs.(data.Axb).^(p-1) .* sign.(data.Axb))
+            g[bs[i].idx] .= transpose(data.A[i]) * (abs.(data.Axb).^(p-1) .* sign.(data.Axb))
         end
     end
 
     # update B_i
-    function B(x, bs, i, data)
+    function B(bs, i, data)
         @inbounds ni = bs[i].ni
         @inbounds if p == 2.0
             return transpose(data.A[i]) * data.A[i] #+ 1e-6*spdiagm(ni, ni, ones(ni))

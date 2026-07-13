@@ -177,6 +177,7 @@ function solve(
         blocks, f, g!, B, data_initialize;
         par = par,
         user_blk = user_blk,
+        user_dec = user_dec,
         x0 = x0,
         verbose = verbose
     )

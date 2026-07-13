@@ -152,7 +152,7 @@ function bcd(
     end
 
     # initialize iteration information structure
-    iter = IterInfo(0, 9, zeros(Float64, n), Inf, par.sig0, Inf, 0, 0, 0)
+    iter = IterInfo(0, 9, zeros(Float64, n), Inf, par.sig0, Inf, 0, 0, 0, Float64[], Float64[])
 
     # initial point
     if !isempty(x0)
@@ -198,6 +198,8 @@ function bcd(
     iter.nf += 1
 
     @inbounds lastf[1] = iter.f
+    push!(iter.fs, iter.f)
+    push!(iter.sigs, sig0)
 
     bid = 0
     prohibited_blk = false
@@ -435,6 +437,8 @@ function bcd(
             end
         end
 
+        push!(iter.fs, iter.f)
+        push!(iter.sigs, iter.sig)
         iter.iter += 1
     end
 end

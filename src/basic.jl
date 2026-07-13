@@ -23,6 +23,8 @@ mutable struct IterInfo
     nf      ::Int64
     ng      ::Int64
     nB      ::Int64
+    sigs    ::Vector{Float64}
+    fs      ::Vector{Float64}
 end
 
 """

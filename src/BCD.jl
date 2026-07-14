@@ -95,7 +95,7 @@ Type `?IterInfo` and `?Param` to view the available properties.
 The function `user_blk` should return the index of the next block and should
 have the header
 
-`user_next(blocks, curr_id, elegible, opts)`,
+`user_blk(blocks, curr_id, elegible, opts)`,
 
 where `blocks` is the vector of blocks, `curr_id` receives the ID of the current
 block, `elegible` is a `BitVector` indicating which blocks are elegible for
@@ -152,7 +152,7 @@ function bcd(
     end
 
     # initialize iteration information structure
-    iter = IterInfo(0, 9, zeros(Float64, n), Inf, par.sig0, Inf, 0, 0, 0, Float64[], Float64[])
+    iter = IterInfo(0, 9, zeros(Float64, n), Inf, par.sig0, Inf, 0, 0, 0)
 
     # initial point
     if !isempty(x0)
@@ -198,8 +198,6 @@ function bcd(
     iter.nf += 1
 
     @inbounds lastf[1] = iter.f
-    push!(iter.fs, iter.f)
-    push!(iter.sigs, sig0)
 
     bid = 0
     prohibited_blk = false
@@ -437,8 +435,6 @@ function bcd(
             end
         end
 
-        push!(iter.fs, iter.f)
-        push!(iter.sigs, iter.sig)
         iter.iter += 1
     end
 end

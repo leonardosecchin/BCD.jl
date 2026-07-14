@@ -1,6 +1,3 @@
-using Pkg
-Pkg.activate("..")
-
 using HSL
 using BCD
 using LinearAlgebra

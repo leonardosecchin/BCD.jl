@@ -299,7 +299,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
     par.maxit = max(5000, 100 * 10)
     par.maxfnoimpr = ceil(Int64, par.maxit/5)
-    for (run_id, alpha) in enumerate([1e-1; 1e-2; 1e-3; 1e-4])
+    for (run_id, alpha) in enumerate([1e-1; 1e-2; 1e-3; 1e-4; 1e-5; 1e-6])
         par.alpha = alpha
         run_tests(run_id = run_id, nb = 10.0, user_dec = dec_min, hist = true)
         run_tests(run_id = run_id, nb = 10.0, user_dec = dec_max, hist = true)

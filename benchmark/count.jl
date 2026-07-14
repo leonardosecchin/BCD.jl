@@ -1,30 +1,46 @@
+using BCD
 using DataFrames
 using JLD2
+using DataFrames
+using Plots
+using Latexify
 
 include("jld2_read.jl")
 
 results = jld2_read("results.jld2", "results")
+results = results[results.st .== 0, :]
 
-# for id in [1;2;3;4], dec in ["dec_min";"dec_max"]
-#     print("run_id = $(id), $(dec): ")
-# end
+table = DataFrame([
+    "run_id" => Int64[];
+    "dec" => String[];
+    "# solved" => Int64[];
+    "% prob σ inc" => Float64[];
+    "# σ inc" => Int64[]
+])
 
-for id in [1;2;3;4], dec in ["dec_min";"dec_max"]
-    println("\n",'='^15," run_id = $(id), $(dec) ",'='^15)
-    rr = results[(results.dec .== dec) .& (results.run_id .== id),[:instance;:st;:sigs]]
+for id in [1;2;3;4;5;6], dec in ["dec_min";"dec_max"]
+    rr = results[(results.dec .== dec) .& (results.run_id .== id),:]
     num_problems_inc = 0
     num_inc = 0
     for r in eachrow(rr)
-        if r.st == 0
-            inc = count(r.sigs .> 1.0)
-            println("st $(r.st): \t #>1: $(inc) \tmax: $(maximum(r.sigs)) \t $(r.instance)")
-            num_problems_inc += inc > 0
-            num_inc += sum(log10.(r.sigs))
-        end
+        inc = count(r.sigs .> 1.0)
+        num_problems_inc += inc > 0
+        num_inc += sum(log10.(r.sigs))
+        fig = plot(; title="",
+            xlabel="iterations",
+            ylabel="",
+            fontfamily="Computer Modern"
+        )
+        ssigs = r.sigs .> 1
+        sfs = log.((r.fs .- minimum(r.fs) .+ 1.0)) / log(maximum(r.fs))
+        fig = plot!(1:length(r.sigs), ssigs; label="σ")
+        fig = plot!(1:length(r.fs), sfs; label="f")
+        savefig(fig, "run_$(id)_$(dec)_$(replace(r.instance, "/" => "")).pdf")
     end
-    solved = count(rr.st .== 0)
-    println("\nNumber of problems solved: ", solved)
-    println("% of problems solved where σ increased: $(100*num_problems_inc/solved)%")
-    println("Total number of increasements: $(Int64(num_inc))")
-    println('='^51)
+    solved = length(rr.st)
+    push!(table,
+        (id, dec, solved, 100*num_problems_inc/solved, Int64(num_inc))
+    )
 end
+
+display(table)

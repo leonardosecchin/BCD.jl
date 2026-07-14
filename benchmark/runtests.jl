@@ -73,6 +73,10 @@ function download_matrices()
     jldsave("lp-lsq.jld2"; problems)
 end
 
+function dec(E, S, iter::IterInfo, par::Param)
+    return (iter.iter <= 20) ? max(E,S) : min(E,S)
+end
+
 function solve(
     A, b;
     q = 10,
@@ -93,6 +97,7 @@ function solve(
 
     fs = Float64[]
     sigs = Float64[]
+    opts = Float64[]
 
     # function to allocate and initialize data
     function data_initialize(x, bs)
@@ -155,6 +160,7 @@ function solve(
     )
         push!(fs, iter.f)
         push!(sigs, iter.sig)
+        push!(opts, iter.opt)
     end
 
     bl_idx = Vector{Int64}(undef, n)

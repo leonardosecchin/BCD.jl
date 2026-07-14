@@ -1,3 +1,6 @@
+using Pkg
+Pkg.activate("..")
+
 using HSL
 using BCD
 using LinearAlgebra
@@ -7,7 +10,6 @@ using Pkg
 using Random
 using DataFrames
 using JLD2
-using Metis
 using MatrixDepot
 
 include("jld2_read.jl")
@@ -78,10 +80,12 @@ function solve(
     A, b;
     q = 10,
     p = 1.5,
-    usemetis = false,
     x0 = [],
     user_blk = blk_cyclic,
-    user_dec = user_dec,
+    user_dec = dec_min,
+    user_callback = nothing,
+    par = default_params(),
+    hist = false,
     verbose = 1
 )
     @assert length(b) == size(A,1) "Dimensions mismatch"
@@ -89,6 +93,9 @@ function solve(
     n = size(A, 2)
 
     D = max(1.0/norm(A,2)^2, 10^3)
+
+    fs = Float64[]
+    sigs = Float64[]
 
     # function to allocate and initialize data
     function data_initialize(x, bs)
@@ -146,52 +153,48 @@ function solve(
         @inbounds spdiagm(ni, ni, ones(ni))
     end
 
-    if usemetis
-        H = A'*A
-        dropzeros!(H)
-        bl_idx = Metis.partition(H, nb)
-    else
-        bl_idx = Vector{Int64}(undef, n)
+    function callback(
+        x, blocks::Vector{Block}, iter::IterInfo, par::Param
+    )
+        push!(fs, iter.f)
+        push!(sigs, iter.sig)
+    end
 
-        # consecutive blocks with balanced size
-        len, inc = divrem(n, q)
-        start = 1
-        for i in 1:inc
-            bl_idx[start:(start + len)] .= i
-            start += len + 1
-        end
-        for i in (inc + 1):q
-            bl_idx[start:(start + len - 1)] .= i
-            start += len
-        end
+    bl_idx = Vector{Int64}(undef, n)
+
+    # consecutive blocks with balanced size
+    len, inc = divrem(n, q)
+    start = 1
+    for i in 1:inc
+        bl_idx[start:(start + len)] .= i
+        start += len + 1
+    end
+    for i in (inc + 1):q
+        bl_idx[start:(start + len - 1)] .= i
+        start += len
     end
     blocks = create_blocks(q, bl_idx)
-
-    par = default_params()
-    par.eps = 1e-3
-    par.alpha = 1e-4
-    par.maxit = max(5000, 100 * q)
-    par.maxfnoimpr = ceil(Int64, par.maxit/5)
 
     time = @elapsed output = bcd(
         blocks, f, g!, B, data_initialize;
         par = par,
         user_blk = user_blk,
         user_dec = user_dec,
+        user_callback = hist ? callback : nothing,
         x0 = x0,
         verbose = verbose
     )
 
-    return output, time
+    return output, fs, sigs, time
 end
 
 function run_tests(;
     p = 1.5,
     nb = 0.5,
     run_id = 0,
-    usemetis = false,
     user_blk = blk_cyclic,
-    user_dec = dec_min
+    user_dec = dec_min,
+    hist = false
 )
     outfile = "results.jld2"
 
@@ -216,6 +219,8 @@ function run_tests(;
             "iter" => Int64[]
             "time" => Float64[]
             "output" => IterInfo[]
+            "fs" => Vector{Float64}[]
+            "sigs" => Vector{Float64}[]
             ]
         )
     end
@@ -252,13 +257,13 @@ function run_tests(;
         println()
 
         try
-            out, time = solve(
+            out, fs, sigs, time = solve(
                 P.A, P.b;
                 q = q,
                 user_blk = user_blk,
                 user_dec = user_dec,
-                usemetis = usemetis,
                 p = p,
+                hist = hist,
                 verbose = 0
             )
 
@@ -276,13 +281,15 @@ function run_tests(;
                 out.status;
                 out.iter;
                 time;
-                out
+                out;
+                [fs];
+                [sigs]
             ]
             push!(results, (row))
 
             jldsave(outfile; results)
         catch err
-            println("ERROR: $(err)")
+            println("ERROR while solving $(P.name)")
         end
     end
 end
@@ -290,18 +297,28 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
     # nb = desired number of variables per block (% of variables)
 
-    # Cyclic selection
-    println("Cyclic selecion...")
-    for nb in [0.5;1.0;5.0;10.0;15.0;20.0]
-        run_tests(nb = nb, user_blk = blk_cyclic, user_dec = dec_min)
+    par = default_params()
+    par.eps = 1e-3
+
+    par.maxit = max(5000, 100 * 10)
+    par.maxfnoimpr = ceil(Int64, par.maxit/5)
+    for (run_id, alpha) in enumerate([1e-1; 1e-2; 1e-3; 1e-4])
+        par.alpha = alpha
+        run_tests(run_id = run_id, nb = 10.0, user_dec = dec_min, hist = true)
+        run_tests(run_id = run_id, nb = 10.0, user_dec = dec_max, hist = true)
     end
+
+    par.alpha = 1e-4
     for nb in [0.5;1.0;5.0;10.0;15.0;20.0]
-        run_tests(nb = nb, user_blk = blk_cyclic, user_dec = dec_max)
+        par.maxit = max(5000, 100 * ceil(Int64, 100 / nb))
+        par.maxfnoimpr = ceil(Int64, par.maxit/5)
+        run_tests(nb = nb, user_dec = dec_min)
+        run_tests(nb = nb, user_dec = dec_max)
     end
 
     # Results
     println("Compiling results...")
-    lplsq_table()
-    pp_blk()
-    pp_S()
+#     lplsq_table()
+#     pp_blk()
+#     pp_S()
 end

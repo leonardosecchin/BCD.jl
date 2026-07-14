@@ -3,8 +3,6 @@ using Format
 using BenchmarkProfiles
 using LaTeXStrings
 
-# run_id: 0 cyclic, 1 metis cyclic
-
 ######################
 # LATEX TABLE
 ######################
@@ -15,14 +13,23 @@ fmt_lf1 = generate_formatter("%5.1lf")
 fmt_e = generate_formatter("%8.2e")
 fmt_etex(v) = replace(fmt_e(v), "e+" => "e\$+\$", "e-" => "e\$-\$")
 
-function lplsq_table(; run_id = 0, nb = 10.0)
+function lplsq_table(;
+    run_id = 0,
+    nb = 10.0,
+    dec = "dec_min",
+    output = "lp-lsq_results"
+)
     results = jld2_read("results.jld2", "results")
     if isnothing(results)
         return
     end
-    results = results[(results.run_id .== run_id) .& (results.nb .== nb),:]
+    results = results[
+        (results.run_id .== run_id) .&
+        (results.nb .== nb) .&
+        (results.dec .== dec)
+    ,:]
 
-    tex = open("lp-lsq_results.tex", "w")
+    tex = open("$(output).tex", "w")
     write(tex, "\\begin{tabular*}{\\textwidth}{@{\\extracolsep\\fill}lcccrrr}\n\\toprule\n")
     write(tex, "Name & \$(m,n)\$ & block size & iter & \$f\$ & opt & time (s)\\\\ \\midrule\n")
     for r in eachrow(results)

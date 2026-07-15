@@ -192,7 +192,7 @@ function bcd(
 
     # evaluate f at the initial point
     # data is up to date regarding the current point, so we pass block id 0
-    iter.f = f(x, [], blocks, 0, data)
+    iter.f = f(iter.x, [], blocks, 0, data)
     iter.nf += 1
 
     @inbounds lastf[1] = iter.f

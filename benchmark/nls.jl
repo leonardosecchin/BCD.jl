@@ -26,6 +26,10 @@ function nls_solve(
     n = nls.meta.nvar
     nres = length(residual(nls, zeros(n)))
 
+    fs = Float64[]
+    sigs = Float64[]
+    opts = Float64[]
+
     function data_initialize(x, bs)
         return DATA(nls, Vector{Float64}(undef, nres))
     end
@@ -85,9 +89,9 @@ function nls_solve(
 
     par = default_params()
     par.eps = 1e-3
-    par.alpha = 1e-4
-    par.maxit = 500#max(5000, 100 * q)
-    par.maxfnoimpr = ceil(Int64, par.maxit/5)
+    par.alpha = 1e-5
+    par.maxit = max(5000, 100 * q)
+    par.maxfnoimpr = 200#ceil(Int64, par.maxit/5)
     par.fest = 1e-5
 
     x0 = obj(nls, nls.meta.x0) == 0.0 ? ones(n) : nls.meta.x0
@@ -105,22 +109,22 @@ function nls_solve(
     return output, fs, sigs, opts, time
 end
 
-function nls_run_tests(; n = 1000, nb = 10.0)
+function nls_run_tests(; n = 1000, nb = 5.0, user_dec = dec_min)
     problems = [
         n -> mgh21(n), # Rosenbrock (n par)
         n -> mgh22(n), # Powell extended (n must be multiple of 4)
-        n -> mgh23(n), # Penalty
-        n -> mgh24(n), # Penalty II
-        n -> mgh25(n), # Variably dimensioned
-        n -> mgh26(n), # Trigonometric function
-        n -> mgh27(n), # Brown
+#         n -> mgh23(n), # Penalty
+#         n -> mgh24(n), # Penalty II
+#         n -> mgh25(n), # Variably dimensioned
+#         n -> mgh26(n), # Trigonometric function
+#         n -> mgh27(n), # Brown
         n -> mgh28(n), # Discrete boundary value function
-        n -> mgh29(n), # Discrete integral equation function
-        n -> mgh30(n), # Broyden tridiagonal
+#         n -> mgh29(n), # Discrete integral equation function
+#         n -> mgh30(n), # Broyden tridiagonal
         n -> mgh31(n), # Broyden banded
-        n -> mgh32(n), # Linear - full rank
-        n -> mgh33(n), # Linear - rank 1
-        n -> mgh34(n)  # Linear - rank 1 with zero cols and rows
+#         n -> mgh32(n), # Linear - full rank
+#         n -> mgh33(n), # Linear - rank 1
+#         n -> mgh34(n)  # Linear - rank 1 with zero cols and rows
     ]
 
     outfile = "results_nls.jld2"
@@ -135,7 +139,7 @@ function nls_run_tests(; n = 1000, nb = 10.0)
                 "instance" => String[]
                 "size" => []
                 "nblocks" => Int64[]
-                "blk_type" => Int64[]
+                "dec" => String[]
                 "f" => Float64[]
                 "gsupn" => Float64[]
                 "st" => []
@@ -157,14 +161,14 @@ function nls_run_tests(; n = 1000, nb = 10.0)
             println("Instance $(nls.meta.name)")
 
             it, fs, sigs, opts, time = nls_solve(
-                nls; q = ceil(Int64, 100 / nb), verbose = 1
+                nls; q = ceil(Int64, 100 / nb), verbose = 1, user_dec = user_dec
             )
 
             row = [
                 nls.meta.name;
                 n;
                 nb;
-                blk_type;
+                String(nameof(user_dec));
                 it.f;
                 it.opt;
                 it.status;

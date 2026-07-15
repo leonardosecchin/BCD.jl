@@ -272,7 +272,7 @@ function bcd(
             bid = user_blk(blocks, bid, eligible_blks, opts)
 
             # compute partial grad f
-            g!(g, blocks, bid, data)
+            g!(iter.x, s, g, blocks, bid, data)
             iter.ng += 1
 
             @views opts[bid] = norm(g[blocks[bid].idx], Inf)

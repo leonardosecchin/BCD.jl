@@ -36,20 +36,21 @@ function `B` that returns the sparse partial Hessian approximation, and the
 function `data_init` that initializes problem-specific structures. Their headers
 should be:
 
-`function f(s, blocks::Vector{Block}, bid, data)`\\
-`function g!(g, blocks::Vector{Block}, bid, data)`\\
-`function B(blocks::Vector{Block}, bid, data)`\\
+`function f(x, s, blocks::Vector{Block}, bid, data)`\\
+`function g!(x, s, g, blocks::Vector{Block}, bid, data)`\\
+`function B(x, s, blocks::Vector{Block}, bid, data)`\\
 `function data_initialize(x, blocks::Vector{Block})`
 
-where `x` is the full vector of variables, `bid` is the block index and `data`
-is a `struct` with all necessary stuff for the problem, defined by the user.
-In the function `g!`, `g` is the full gradient and the partial gradient, whose
-entries associated with block index `bid` receive the corresponding partial
-gradient at the current point. Function `f` should return a `Float64`, function
-`B!` should return the matrix `B` in sparse format, and `data_initialize` the
-structure `data` initialized at `x`. Only lower triangle of `B` should be
-provided. Note that fields in `data` are modified during the method, so it must
-be `mutable` if it contains numeric fields.
+where `bid` is the block index, `x` is the full vector of variables, `s` is the
+partial direction w.r.t. the block `bid`,  and `data` is a `struct` with all
+necessary stuff for the problem, defined by the user. In the function `g!`, `g`
+is the full gradient and the partial gradient, whose entries associated with
+block index `bid` receive the corresponding partial gradient at the current
+point. Function `f` should return a `Float64`, function `B!` should return the
+matrix `B` in sparse format, and `data_initialize` the structure `data`
+initialized at `x`. Only lower triangle of `B` should be provided. Note that
+fields in `data` are modified during the method, so it must be `mutable` if it
+contains numeric fields.
 
 It is important to note that `f` receives the partial direction `s`, that is,
 the vector of components of `x+ - x` in the block `i`, where `x+` is the point
@@ -170,9 +171,6 @@ function bcd(
     # intialize data
     data = data_init(iter.x, blocks)
 
-    # working vectors
-    xtrial = deepcopy(iter.x)
-
     g  = similar(iter.x)
     xi = Vector{Float64}(undef, maxni)
     si = similar(xi)
@@ -194,7 +192,7 @@ function bcd(
 
     # evaluate f at the initial point
     # data is up to date regarding the current point, so we pass block id 0
-    iter.f = f([], blocks, 0, data)
+    iter.f = f(x, [], blocks, 0, data)
     iter.nf += 1
 
     @inbounds lastf[1] = iter.f
@@ -408,11 +406,8 @@ function bcd(
                 break
             end
 
-            # xtrial = x + s
-            @views @. xtrial[blocks[bid].idx] = xi + si
-
             # descent condition
-            ftrial = f(si, blocks, bid, data)
+            ftrial = f(iter.x, si, blocks, bid, data)
             iter.nf += 1
 
             dec = user_dec(E, S, iter, par)
@@ -422,7 +417,7 @@ function bcd(
             if (ftrial/norm_f <= iter.f/norm_f - dec + eps(norm_f)) ||
                (sisupn <= 1e-12 * norm(xi, Inf))
                 # success, update iter.x
-                @views iter.x[blocks[bid].idx] .= xtrial[blocks[bid].idx]
+                @views iter.x[blocks[bid].idx] .= xi .+ si
 
                 # update f for the next iteration
                 iter.f = ftrial

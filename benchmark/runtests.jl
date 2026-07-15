@@ -121,7 +121,7 @@ function solve(
     # f(x) = 1/p |Ax - b|_p^p
     # i = 0 indicates that data.Axb is up to date, so we compute the p-norm
     # directly
-    function f(s, bs, i, data)
+    function f(x, s, bs, i, data)
         if (i > 0)
             # compute Ai * s
             @inbounds data.Asi .= data.A[i] * s
@@ -132,7 +132,7 @@ function solve(
     end
 
     # partial gradient
-    function g!(g, bs, i, data)
+    function g!(x, s, g, bs, i, data)
         @inbounds @views if p == 2.0
             g[bs[i].idx] .= transpose(data.A[i]) * data.Axb
         else
@@ -141,18 +141,13 @@ function solve(
     end
 
     # update B_i
-    function B(bs, i, data)
+    function B(x, s, bs, i, data)
         @inbounds ni = bs[i].ni
         @inbounds if p == 2.0
             return transpose(data.A[i]) * data.A[i]
         else
             return (p-1)*transpose(data.A[i]) * spdiagm(min.(abs.(data.Axb).^(p-2), D)) * data.A[i]
         end
-    end
-
-    function Id(bs, i, data)
-        @inbounds ni = bs[i].ni
-        @inbounds spdiagm(ni, ni, ones(ni))
     end
 
     function callback(
@@ -188,7 +183,7 @@ function solve(
         verbose = verbose
     )
 
-    return output, fs, sigs, time
+    return output, fs, sigs, opts, time
 end
 
 function run_tests(;
@@ -224,6 +219,7 @@ function run_tests(;
             "output" => IterInfo[]
             "fs" => Vector{Float64}[]
             "sigs" => Vector{Float64}[]
+            "opts" => Vector{Float64}[]
             ]
         )
     end
@@ -260,7 +256,7 @@ function run_tests(;
         println()
 
         try
-            out, fs, sigs, time = solve(
+            out, fs, sigs, opts, time = solve(
                 P.A, P.b;
                 q = q,
                 user_blk = user_blk,
@@ -286,7 +282,8 @@ function run_tests(;
                 time;
                 out;
                 [fs];
-                [sigs]
+                [sigs];
+                [opts]
             ]
             push!(results, (row))
 

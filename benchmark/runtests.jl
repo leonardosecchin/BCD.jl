@@ -132,7 +132,7 @@ function solve(
     end
 
     # partial gradient
-    function g!(x, s, g, bs, i, data)
+    function g!(g, x, bs, i, data)
         @inbounds @views if p == 2.0
             g[bs[i].idx] .= transpose(data.A[i]) * data.Axb
         else
@@ -141,7 +141,7 @@ function solve(
     end
 
     # update B_i
-    function B(x, s, bs, i, data)
+    function B(x, bs, i, data)
         @inbounds ni = bs[i].ni
         @inbounds if p == 2.0
             return transpose(data.A[i]) * data.A[i]

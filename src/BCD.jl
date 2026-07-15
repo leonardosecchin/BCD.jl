@@ -37,8 +37,8 @@ function `data_init` that initializes problem-specific structures. Their headers
 should be:
 
 `function f(x, s, blocks::Vector{Block}, bid, data)`\\
-`function g!(x, s, g, blocks::Vector{Block}, bid, data)`\\
-`function B(x, s, blocks::Vector{Block}, bid, data)`\\
+`function g!(g, x, blocks::Vector{Block}, bid, data)`\\
+`function B(x, blocks::Vector{Block}, bid, data)`\\
 `function data_initialize(x, blocks::Vector{Block})`
 
 where `bid` is the block index, `x` is the full vector of variables, `s` is the
@@ -272,7 +272,7 @@ function bcd(
             bid = user_blk(blocks, bid, eligible_blks, opts)
 
             # compute partial grad f
-            g!(iter.x, s, g, blocks, bid, data)
+            g!(g, iter.x, blocks, bid, data)
             iter.ng += 1
 
             @views opts[bid] = norm(g[blocks[bid].idx], Inf)
@@ -308,7 +308,7 @@ function bcd(
 
         # compute B
         # only the lower triangle of B must be given
-        Bi = B(blocks, bid, data)
+        Bi = B(iter.x, blocks, bid, data)
         iter.nB += 1
 
         if isempty(Bi)

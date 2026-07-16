@@ -93,7 +93,7 @@ function solve(
 
     n = size(A, 2)
 
-    D = max(1.0/norm(A,2)^2, 10^3)
+    D = 10^3
 
     fs = Float64[]
     sigs = Float64[]
@@ -294,13 +294,13 @@ function run_tests(;
     end
 end
 
-if abspath(PROGRAM_FILE) == @__FILE__
+function run_all()
     # nb = desired number of variables per block (% of variables)
 
     par = default_params()
     par.eps = 1e-3
 
-    par.maxit = max(5000, 100 * 10)
+    par.maxit = 100 * 10
     par.maxfnoimpr = ceil(Int64, par.maxit/5)
     for (run_id, alpha) in enumerate([1e-1; 1e-2; 1e-3; 1e-4; 1e-5; 1e-6])
         par.alpha = alpha
@@ -310,7 +310,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
     par.alpha = 1e-4
     for nb in [0.5;1.0;5.0;10.0;15.0;20.0]
-        par.maxit = max(5000, 100 * ceil(Int64, 100 / nb))
+        par.maxit = 100 * ceil(Int64, 100 / nb)
         par.maxfnoimpr = ceil(Int64, par.maxit/5)
         run_tests(nb = nb, user_dec = dec_min)
         run_tests(nb = nb, user_dec = dec_max)
@@ -318,7 +318,11 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
     # Results
     println("Compiling results...")
-#     lplsq_table()
-#     pp_blk()
-#     pp_S()
+    #     lplsq_table()
+    #     pp_blk()
+    #     pp_S()
+end
+
+if abspath(PROGRAM_FILE) == @__FILE__
+    run_all()
 end

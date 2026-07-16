@@ -33,9 +33,9 @@ for id in [1;2;3;4;5;6], dec in ["dec_min";"dec_max"]
         )
         ssigs = r.sigs .> 1
         sfs = log.((r.fs .- minimum(r.fs) .+ 1.0)) / log(maximum(r.fs))
-        fig = plot!(1:length(r.sigs), ssigs; label="σ")
-        fig = plot!(1:length(r.fs), sfs; label="f")
-        savefig(fig, "run_$(id)_$(dec)_$(replace(r.instance, "/" => "")).pdf")
+#         fig = plot!(1:length(r.sigs), ssigs; label="σ")
+#         fig = plot!(1:length(r.fs), sfs; label="f")
+#         savefig(fig, "run_$(id)_$(dec)_$(replace(r.instance, "/" => "")).pdf")
     end
     solved = length(rr.st)
     push!(table,

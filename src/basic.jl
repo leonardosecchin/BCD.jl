@@ -55,7 +55,7 @@ end
 Returns a `Param` structure with default values.
 """
 function default_params()
-    return Param(1e-4, 1e-4, 1.0, 10000, 1.0, -Inf, 1e+20, 0)
+    return Param(1e-4, 1e-4, 1.0, 10000, 1.0, -Inf, 1e+20, 200)
 end
 
 # convert a Vector{Int64} into a UnitRange if possible

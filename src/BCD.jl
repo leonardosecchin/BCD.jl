@@ -176,10 +176,8 @@ function bcd(
     si = similar(xi)
     prev_si = similar(xi)
 
-    maxfnoimpr = (par.maxfnoimpr > 0) ? par.maxfnoimpr : max(10, 2 * length(blocks))
-
     opts  = fill(Inf, length(blocks))
-    lastf = fill(Inf, maxfnoimpr)
+    lastf = fill(Inf, par.maxfnoimpr)
 
     # for MA57
     ma57work = similar(xi)
@@ -195,7 +193,9 @@ function bcd(
     iter.f = f(iter.x, [], blocks, 0, data)
     iter.nf += 1
 
-    @inbounds lastf[1] = iter.f
+    if par.maxfnoimpr > 0
+        @inbounds lastf[1] = iter.f
+    end
 
     bid = 0
     prohibited_blk = false
@@ -237,16 +237,18 @@ function bcd(
         end
 
         # test whether f did not improved
-        if maximum(lastf) <= iter.f + 1e-8 * max(1.0, iter.f)
-            printiter(iter, bid, verbose, true)
-            if verbose > 0
-                println("\nEXIT STATUS: Lack of progress")
+        if par.maxfnoimpr > 0
+            if maximum(lastf) <= iter.f + 1e-8 * max(1.0, iter.f)
+                printiter(iter, bid, verbose, true)
+                if verbose > 0
+                    println("\nEXIT STATUS: Lack of progress")
+                end
+                iter.status = 4
+                return iter
             end
-            iter.status = 4
-            return iter
-        end
 
-        lastf[mod(iter.iter, maxfnoimpr) + 1] = iter.f
+            lastf[mod(iter.iter, par.maxfnoimpr) + 1] = iter.f
+        end
 
         # turn all blocks elegible
         eligible_blks .= true
@@ -480,7 +482,7 @@ function printbanner(blocks::Vector{Block}, par::Param)
     @printf("α                                              %9.2e\n", par.alpha)
     @printf("θ                                              %9.2e\n", par.theta)
     @printf("Max number of iterations without improvement   %9d\n"  ,
-        (par.maxfnoimpr > 0) ? par.maxfnoimpr : 2 * length(blocks))
+        (par.maxfnoimpr > 0) ? par.maxfnoimpr : par.maxit)
     println('='^56)
 end
 

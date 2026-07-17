@@ -81,7 +81,6 @@ function solve(
     A, b;
     q = 10,
     p = 1.5,
-    x0 = [],
     user_blk = blk_cyclic,
     user_dec = dec_min,
     user_callback = nothing,
@@ -179,7 +178,6 @@ function solve(
         user_blk = user_blk,
         user_dec = user_dec,
         user_callback = hist ? callback : nothing,
-        x0 = x0,
         verbose = verbose
     )
 
@@ -192,7 +190,8 @@ function run_tests(;
     run_id = 0,
     user_blk = blk_cyclic,
     user_dec = dec_min,
-    hist = false
+    hist = false,
+    par = default_params()
 )
     outfile = "results.jld2"
 
@@ -263,6 +262,7 @@ function run_tests(;
                 user_dec = user_dec,
                 p = p,
                 hist = hist,
+                par = par,
                 verbose = 0
             )
 
@@ -304,16 +304,16 @@ function run_all()
     par.maxfnoimpr = ceil(Int64, par.maxit/5)
     for (run_id, alpha) in enumerate([1e-1; 1e-2; 1e-3; 1e-4; 1e-5; 1e-6])
         par.alpha = alpha
-        run_tests(run_id = run_id, nb = 10.0, user_dec = dec_min, hist = true)
-        run_tests(run_id = run_id, nb = 10.0, user_dec = dec_max, hist = true)
+        run_tests(run_id = run_id, nb = 10.0, user_dec = dec_min, hist = true, par = par)
+        run_tests(run_id = run_id, nb = 10.0, user_dec = dec_max, hist = true, par = par)
     end
 
     par.alpha = 1e-4
     for nb in [0.5;1.0;5.0;10.0;15.0;20.0]
         par.maxit = 100 * ceil(Int64, 100 / nb)
         par.maxfnoimpr = ceil(Int64, par.maxit/5)
-        run_tests(nb = nb, user_dec = dec_min)
-        run_tests(nb = nb, user_dec = dec_max)
+        run_tests(nb = nb, user_dec = dec_min, par = par)
+        run_tests(nb = nb, user_dec = dec_max, par = par)
     end
 
     # Results

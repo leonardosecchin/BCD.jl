@@ -11,7 +11,7 @@ results = jld2_read("results.jld2", "results")
 results = results[results.st .== 0, :]
 
 table = DataFrame([
-    "run_id" => Int64[];
+    "alpha" => Float64[];
     "dec" => String[];
     "# solved" => Int64[];
     "% prob σ inc" => Float64[];
@@ -39,7 +39,7 @@ for id in [1;2;3;4;5;6], dec in ["dec_min";"dec_max"]
     end
     solved = length(rr.st)
     push!(table,
-        (id, dec, solved, 100*num_problems_inc/solved, Int64(num_inc))
+        (rr.alpha, dec, solved, 100*num_problems_inc/solved, Int64(num_inc))
     )
 end
 

@@ -78,14 +78,8 @@ function dec(E, S, iter::IterInfo, par::Param)
 end
 
 function solve(
-    A, b;
-    q = 10,
+    A, b, q, user_blk, user_dec, user_callback, hist, par;
     p = 1.5,
-    user_blk = blk_cyclic,
-    user_dec = dec_min,
-    user_callback = nothing,
-    par = default_params(),
-    hist = false,
     verbose = 1
 )
     @assert length(b) == size(A,1) "Dimensions mismatch"
@@ -184,15 +178,8 @@ function solve(
     return output, fs, sigs, opts, time
 end
 
-function run_tests(;
-    p = 1.5,
-    nb = 0.5,
-    run_id = 0,
-    user_blk = blk_cyclic,
-    user_dec = dec_min,
-    hist = false,
-    par = default_params()
-)
+function run_tests(run_id, nb, user_blk, user_dec, hist, par; p = 1.5)
+
     outfile = "results.jld2"
 
     if isfile(outfile)
@@ -219,6 +206,7 @@ function run_tests(;
             "fs" => Vector{Float64}[]
             "sigs" => Vector{Float64}[]
             "opts" => Vector{Float64}[]
+            "alpha" => Float64[]
             ]
         )
     end
@@ -256,13 +244,7 @@ function run_tests(;
 
         try
             out, fs, sigs, opts, time = solve(
-                P.A, P.b;
-                q = q,
-                user_blk = user_blk,
-                user_dec = user_dec,
-                p = p,
-                hist = hist,
-                par = par,
+                P.A, P.b, q, user_blk, user_dec, user_callback, hist, par;
                 verbose = 0
             )
 
@@ -283,7 +265,8 @@ function run_tests(;
                 out;
                 [fs];
                 [sigs];
-                [opts]
+                [opts];
+                par.alpha
             ]
             push!(results, (row))
 
@@ -300,27 +283,29 @@ function run_all()
     par = default_params()
     par.eps = 1e-3
 
+    # run_id = 1 to 7: calibrate alpha
     par.maxit = 100 * 10
-    par.maxfnoimpr = ceil(Int64, par.maxit/5)
-    for (run_id, alpha) in enumerate([1e-1; 1e-2; 1e-3; 1e-4; 1e-5; 1e-6])
+    par.maxfnoimpr = ceil(Int64, par.maxit/2)
+    for (run_id, alpha) in enumerate([1e-1; 1e-2; 1e-3; 1e-4; 1e-5; 1e-6; 1e-7])
         par.alpha = alpha
-        run_tests(run_id = run_id, nb = 10.0, user_dec = dec_min, hist = true, par = par)
-        run_tests(run_id = run_id, nb = 10.0, user_dec = dec_max, hist = true, par = par)
+        run_tests(run_id, 10.0, blk_cyclic, dec_min, true, par)
+        run_tests(run_id, 10.0, blk_cyclic, dec_max, true, par)
     end
 
+    # run_id = 0: table, varying nb
     par.alpha = 1e-4
     for nb in [0.5;1.0;5.0;10.0;15.0;20.0]
         par.maxit = 100 * ceil(Int64, 100 / nb)
-        par.maxfnoimpr = ceil(Int64, par.maxit/5)
-        run_tests(nb = nb, user_dec = dec_min, par = par)
-        run_tests(nb = nb, user_dec = dec_max, par = par)
+        par.maxfnoimpr = ceil(Int64, par.maxit/2)
+        run_tests(0, nb, blk_cyclic, dec_min, false, par)
+        run_tests(0, nb, blk_cyclic, dec_max, false, par)
     end
 
     # Results
     println("Compiling results...")
-    #     lplsq_table()
-    #     pp_blk()
-    #     pp_S()
+    statistics()
+    lplsq_table()
+    pp()
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__

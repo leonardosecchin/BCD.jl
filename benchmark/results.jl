@@ -1,7 +1,14 @@
+using BCD
+using DataFrames
+using JLD2
+using DataFrames
 using Plots
 using Format
 using BenchmarkProfiles
 using LaTeXStrings
+using Latexify
+
+include("jld2_read.jl")
 
 ######################
 # LATEX TABLE
@@ -54,36 +61,36 @@ function BenchmarkProfiles.powertick(s::AbstractString)
     return s
 end
 
-function pp_blk(; nb = 10.0, runs = [0;1], p = 1.5)
+# function pp_blk(; nb = 10.0, runs = [0;1], p = 1.5)
+#     results = jld2_read("results.jld2","results")
+#     results = results[(results.nb .== nb) .& (results.p .== p),:]
+#
+#     results[results.st .!= 0,:iter] .= -1
+#
+#     algs = Dict(
+#         0 => "Cyclic",
+#         1 => "Cyclic w/ Metis"
+#     )
+#
+#     labels = String[]
+#     iters = []
+#     for r in runs
+#         if isempty(iters)
+#             iters = Float64.(results[results.run_id .== r,:iter])
+#         else
+#             iters = hcat(iters, Float64.(results[results.run_id .== r,:iter]))
+#         end
+#         push!(labels, algs[r])
+#     end
+#     iters[iters .< 0] .= Inf
+#
+#     fig = performance_profile(PlotsBackend(), iters, labels, title = "Outer iterations", fontfamily="Computer Modern")
+#     Plots.savefig(fig, "pp_blk_iter.pdf")
+# end
+
+function pp(; nb = 10.0, p = 1.5, run_id = 0)
     results = jld2_read("results.jld2","results")
-    results = results[(results.nb .== nb) .& (results.p .== p),:]
-
-    results[results.st .!= 0,:iter] .= -1
-
-    algs = Dict(
-        0 => "Cyclic",
-        1 => "Cyclic w/ Metis"
-    )
-
-    labels = String[]
-    iters = []
-    for r in runs
-        if isempty(iters)
-            iters = Float64.(results[results.run_id .== r,:iter])
-        else
-            iters = hcat(iters, Float64.(results[results.run_id .== r,:iter]))
-        end
-        push!(labels, algs[r])
-    end
-    iters[iters .< 0] .= Inf
-
-    fig = performance_profile(PlotsBackend(), iters, labels, title = "Outer iterations", fontfamily="Computer Modern")
-    Plots.savefig(fig, "pp_blk_iter.pdf")
-end
-
-function pp_S(; nb = 10.0)
-    results = jld2_read("results.jld2","results")
-    results = results[(results.run_id .== 0) .& (results.p .== 1.5) .& (results.nb .== nb),:]
+    results = results[(results.run_id .== run_id) .& (results.p .== p) .& (results.nb .== nb),:]
 
     results[results.st .!= 0,:time] .= Inf
     results[results.st .!= 0,:iter] .= -1
@@ -109,4 +116,50 @@ function pp_S(; nb = 10.0)
 
     fig = performance_profile(PlotsBackend(), iters, labels, title = "Outer iterations", legend = :bottomright, fontfamily="Computer Modern")
     Plots.savefig(fig, "pp_S_iter.pdf")
+end
+
+function statistics()
+    results = jld2_read("results.jld2","results")
+    results = results[(results.st .== 0) .& (results.run_id .> 0), :]
+
+    table = DataFrame([
+        "alpha" => Float64[];
+        "dec" => String[];
+        "# solved" => Int64[];
+        "% prob σ inc" => Float64[];
+        "# σ inc" => Int64[]
+    ])
+
+    ids = unique(results.run_id)
+
+    for id in ids, dec in ["dec_min";"dec_max"]
+        rr = results[(results.dec .== dec) .& (results.run_id .== id),:]
+        num_problems_inc = 0
+        num_inc = 0
+        for r in eachrow(rr)
+            inc = count(r.sigs .> 1.0)
+            num_problems_inc += inc > 0
+            num_inc += sum(log10.(r.sigs))
+            fig = plot(; title="",
+                       xlabel="iterations",
+                       ylabel="",
+                       fontfamily="Computer Modern"
+                       )
+            ssigs = r.sigs .> 1
+            sfs = log.((r.fs .- minimum(r.fs) .+ 1.0)) / log(maximum(r.fs))
+#             fig = plot!(1:length(r.sigs), ssigs; label="σ")
+#             fig = plot!(1:length(r.fs), sfs; label="f")
+#             savefig(fig, "run_$(id)_$(dec)_$(replace(r.instance, "/" => "")).pdf")
+        end
+        solved = length(rr.st)
+        push!(table,
+            (rr.alpha, dec, solved, 100*num_problems_inc/solved, Int64(num_inc))
+        )
+    end
+
+    tex = latexify(table)
+
+    open("count.txt", "w") do io
+        print(io, String(tex))
+    end
 end

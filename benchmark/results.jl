@@ -132,7 +132,7 @@ function statistics()
 
     ids = unique(results.run_id)
 
-    for id in ids, dec in ["dec_min";"dec_max"]
+    for id in ids, dec in ["dec_min";"dec_max";"dec_onlyE"]
         rr = results[(results.dec .== dec) .& (results.run_id .== id),:]
         num_problems_inc = 0
         num_inc = 0
@@ -141,15 +141,15 @@ function statistics()
             num_problems_inc += inc > 0
             num_inc += sum(log10.(r.sigs))
             fig = plot(; title="",
-                       xlabel="iterations",
-                       ylabel="",
-                       fontfamily="Computer Modern"
-                       )
+                xlabel="iterations",
+                ylabel="",
+                fontfamily="Computer Modern"
+            )
             ssigs = r.sigs .> 1
             sfs = log.((r.fs .- minimum(r.fs) .+ 1.0)) / log(maximum(r.fs))
-#             fig = plot!(1:length(r.sigs), ssigs; label="σ")
-#             fig = plot!(1:length(r.fs), sfs; label="f")
-#             savefig(fig, "run_$(id)_$(dec)_$(replace(r.instance, "/" => "")).pdf")
+            fig = plot!(1:length(r.sigs), ssigs; label="σ")
+            fig = plot!(1:length(r.fs), sfs; label="f")
+            savefig(fig, "run_$(id)_$(dec)_$(replace(r.instance, "/" => "")).pdf")
         end
         solved = length(rr.st)
         push!(table,

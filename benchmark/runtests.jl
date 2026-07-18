@@ -76,9 +76,12 @@ end
 function dec(E, S, iter::IterInfo, par::Param)
     return (iter.iter <= 20) ? max(E,S) : min(E,S)
 end
+function dec_onlyE(E, S, iter::IterInfo, par::Param)
+    return E
+end
 
 function solve(
-    A, b, q, user_blk, user_dec, user_callback, hist, par;
+    A, b, q, user_blk, user_dec, hist, par;
     p = 1.5,
     verbose = 1
 )
@@ -244,7 +247,7 @@ function run_tests(run_id, nb, user_blk, user_dec, hist, par; p = 1.5)
 
         try
             out, fs, sigs, opts, time = solve(
-                P.A, P.b, q, user_blk, user_dec, user_callback, hist, par;
+                P.A, P.b, q, user_blk, user_dec, hist, par;
                 verbose = 0
             )
 
@@ -290,6 +293,7 @@ function run_all()
         par.alpha = alpha
         run_tests(run_id, 10.0, blk_cyclic, dec_min, true, par)
         run_tests(run_id, 10.0, blk_cyclic, dec_max, true, par)
+        run_tests(run_id, 10.0, blk_cyclic, dec_onlyE, true, par)
     end
 
     # run_id = 0: table, varying nb
@@ -299,6 +303,7 @@ function run_all()
         par.maxfnoimpr = ceil(Int64, par.maxit/2)
         run_tests(0, nb, blk_cyclic, dec_min, false, par)
         run_tests(0, nb, blk_cyclic, dec_max, false, par)
+        run_tests(0, nb, blk_cyclic, dec_onlyE, false, par)
     end
 
     # Results

@@ -79,6 +79,9 @@ end
 function dec_onlyE(E, S, iter::IterInfo, par::Param)
     return E
 end
+function dec_onlyS(E, S, iter::IterInfo, par::Param)
+    return S
+end
 
 function solve(
     A, b, q, user_blk, user_dec, hist, par;
@@ -230,7 +233,7 @@ function run_tests(run_id, nb, user_blk, user_dec, hist, par; p = 1.5)
         # number of blocks: q = n / ni = 100 / nb
         q = ceil(Int64, 100 / nb)
 
-        print("Instance $(P.name), nb = $(nb)%, p = $(p)")
+        print("Run id $(run_id), blk $(user_blk), dec $(user_dec), nb = $(nb)% , instance $(P.name)")
         if !isempty(
             results[
             (results.run_id .== run_id) .&
@@ -294,16 +297,18 @@ function run_all()
         run_tests(run_id, 10.0, blk_cyclic, dec_min, true, par)
         run_tests(run_id, 10.0, blk_cyclic, dec_max, true, par)
         run_tests(run_id, 10.0, blk_cyclic, dec_onlyE, true, par)
+        run_tests(run_id, 10.0, blk_cyclic, dec_onlyS, true, par)
     end
 
     # run_id = 0: table, varying nb
-    par.alpha = 1e-4
+    par.alpha = 1e-6
     for nb in [0.5;1.0;5.0;10.0;15.0;20.0]
         par.maxit = 100 * ceil(Int64, 100 / nb)
         par.maxfnoimpr = ceil(Int64, par.maxit/2)
         run_tests(0, nb, blk_cyclic, dec_min, false, par)
         run_tests(0, nb, blk_cyclic, dec_max, false, par)
         run_tests(0, nb, blk_cyclic, dec_onlyE, false, par)
+        run_tests(0, nb, blk_cyclic, dec_onlyS, false, par)
     end
 
     # Results

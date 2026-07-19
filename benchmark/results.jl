@@ -122,18 +122,27 @@ function statistics()
     results = jld2_read("results.jld2","results")
     results = results[(results.st .== 0) .& (results.run_id .> 0), :]
 
+    if !isdir("figures")
+        mkdir("figures")
+    end
+
     table = DataFrame([
         "alpha" => Float64[];
         "dec" => String[];
-        "# solved" => Int64[];
-        "% prob σ inc" => Float64[];
-        "# σ inc" => Int64[]
+        "solved" => Int64[];
+        "prob_inc" => Int64[];
+        "total_inc" => Int64[]
     ])
 
     ids = unique(results.run_id)
+    decs = unique(results.dec)
 
-    for id in ids, dec in ["dec_min";"dec_max";"dec_onlyE"]
+    for id in ids, dec in decs
         rr = results[(results.dec .== dec) .& (results.run_id .== id),:]
+        if isempty(rr)
+            println("No problems solved for $(dec), run_id $(id)")
+            continue
+        end
         num_problems_inc = 0
         num_inc = 0
         for r in eachrow(rr)
@@ -147,19 +156,44 @@ function statistics()
             )
             ssigs = r.sigs .> 1
             sfs = log.((r.fs .- minimum(r.fs) .+ 1.0)) / log(maximum(r.fs))
-            fig = plot!(1:length(r.sigs), ssigs; label="σ")
-            fig = plot!(1:length(r.fs), sfs; label="f")
-            savefig(fig, "run_$(id)_$(dec)_$(replace(r.instance, "/" => "")).pdf")
+#             fig = plot!(1:length(r.sigs), ssigs; label="σ")
+#             fig = plot!(1:length(r.fs), sfs; label="f")
+#             savefig(fig, "figures/run_$(id)_$(dec)_$(replace(r.instance, "/" => "")).pdf")
         end
         solved = length(rr.st)
         push!(table,
-            (rr.alpha, dec, solved, 100*num_problems_inc/solved, Int64(num_inc))
+            (rr.alpha[1], dec, solved, num_problems_inc, Int64(num_inc))
         )
     end
 
-    tex = latexify(table)
-
-    open("count.txt", "w") do io
-        print(io, String(tex))
+    tex = open("statistics.tex", "w")
+    write(tex, "\\begin{tabular*}{\\textwidth}{@{\\extracolsep\\fill}l$(repeat('c',3*length(decs)))}\n\\toprule\n")
+    for dec in decs
+        d = replace(basename(string(dec)), "dec_" => "")
+        write(tex, " & \\multicolumn{2}{c}{$(d)} &")
     end
+    write(tex, "\\\\ \n \$\\alpha\$")
+    for dec in decs
+        write(tex, " & \\#sol. & \\#\$\\sigma\\uparrow\$ &")
+    end
+    write(tex, "\\\\ \\midrule\n")
+
+    alphas = unique(table.alpha)
+    for a in alphas
+        write(tex, "\$10^{$(Int64(log10(a)))}\$")
+        for dec in decs
+            t = table[(table.dec .== dec) .& (table.alpha .== a),:]
+            if length(t[:,1]) != 1
+                write(tex, "& -- & -- &")
+                continue
+            end
+            write(tex, "& $(t.solved[1]) ($(t.prob_inc[1])) & $(t.total_inc[1]) &")
+        end
+        write(tex, "\\\\ \n")
+    end
+    write(tex, "\\bottomrule\n\\end{tabular*}")
+    close(tex)
+#     open("statistics.txt", "w") do io
+#         print(io, string(table))
+#     end
 end

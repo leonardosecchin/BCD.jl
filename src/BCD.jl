@@ -428,7 +428,7 @@ function bcd(
                 break
             else
                 # increase sig and try again
-                iter.sig = max(1.0, 10.0 * iter.sig)
+                iter.sig = max(1.0, 2.0 * iter.sig)
             end
         end
 

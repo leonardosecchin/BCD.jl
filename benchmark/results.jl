@@ -119,13 +119,13 @@ function pp(; nb = 10.0, p = 1.5, run_id = 0)
 end
 
 function statistics()
-    results = jld2_read("results.jld2","results")
-    results = results[(results.st .== 0) .& (results.run_id .> 0), :]
+    results_all = jld2_read("results.jld2","results")
 
     if !isdir("figures")
         mkdir("figures")
     end
 
+    # Summarize the results
     table = DataFrame([
         "alpha" => Float64[];
         "dec" => String[];
@@ -134,6 +134,7 @@ function statistics()
         "total_inc" => Int64[]
     ])
 
+    results = results_all[(results_all.st .== 0) .& (results_all.run_id .> 0), :]
     ids = unique(results.run_id)
     decs = unique(results.dec)
 
@@ -149,16 +150,16 @@ function statistics()
             inc = count(r.sigs .> 1.0)
             num_problems_inc += inc > 0
             num_inc += sum(log10.(r.sigs))
-            fig = plot(; title="",
-                xlabel="iterations",
-                ylabel="",
-                fontfamily="Computer Modern"
-            )
-            ssigs = r.sigs .> 1
-            sfs = log.((r.fs .- minimum(r.fs) .+ 1.0)) / log(maximum(r.fs))
+#             fig = plot(; title="",
+#                 xlabel="iterations",
+#                 ylabel="",
+#                 fontfamily="Computer Modern"
+#             )
+#             ssigs = r.sigs .> 1
+#             sfs = log.((r.fs .- minimum(r.fs) .+ 1.0)) / log(maximum(r.fs))
 #             fig = plot!(1:length(r.sigs), ssigs; label="σ")
 #             fig = plot!(1:length(r.fs), sfs; label="f")
-#             savefig(fig, "figures/run_$(id)_$(dec)_$(replace(r.instance, "/" => "")).pdf")
+#             savefig(fig, "figures/run_$(id)_$(dec)_$(basename(r.instance)).pdf")
         end
         solved = length(rr.st)
         push!(table,
@@ -166,6 +167,7 @@ function statistics()
         )
     end
 
+    # Write tex table
     tex = open("statistics.tex", "w")
     write(tex, "\\begin{tabular*}{\\textwidth}{@{\\extracolsep\\fill}l$(repeat('c',3*length(decs)))}\n\\toprule\n")
     for dec in decs
@@ -193,7 +195,49 @@ function statistics()
     end
     write(tex, "\\bottomrule\n\\end{tabular*}")
     close(tex)
-#     open("statistics.txt", "w") do io
-#         print(io, string(table))
+
+    # Figures of each problem, specific run_id
+    decs = ["dec_min";"dec_max";"dec_onlyE"]
+    results = results_all[(results_all.run_id .== 6) .& (results_all.st .== 0), :]
+
+    for p in eachrow(results)
+        name = basename(p.instance)
+        fig = plot(; title=name,
+            xlabel="iterations",
+            ylabel="times increased",
+            fontfamily="Computer Modern"
+        )
+        for dec in decs
+            rr = results[(results.instance .== p.instance) .& (results.dec .== dec), :]
+            if isempty(rr)
+                continue
+            end
+            sigs = log10.(rr.sigs[1])
+            fig = plot!(1:length(sigs), sigs, label=dec)
+            println("Problem $(name), $(dec), times increased: $(sum(sigs))")
+        end
+        savefig(fig, "figures/sigma_$(name).pdf")
+    end
+
+#     data = zeros(Int64, length(results.instance), length(decs))
+#     for p in 1:length(results.instance)
+#         for d in 1:length(decs)
+#             rr = results[(results.instance .== results.instance[p]) .& (results.dec .== decs[d]), :]
+#             if isempty(rr)
+#                 continue
+#             end
+#             data[p,d] = sum(log10.(rr.sigs[1]))
+#         end
 #     end
+
+#     fig = bar(
+#         basename.(results.instance),
+#         data;
+#         bar_position = :dodge,
+#         label = decs,
+#         xrotation = 90,
+#         size = (1600, 600),
+#         bar_width = 0.8
+#     )
+#     savefig(fig, "teste.pdf")
 end

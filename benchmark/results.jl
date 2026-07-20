@@ -90,7 +90,7 @@ end
 
 function pp(; nb = 10.0, p = 1.5, run_id = 0)
     results = jld2_read("results.jld2","results")
-    results = results[(results.run_id .== run_id) .& (results.p .== p) .& (results.nb .== nb),:]
+    results = results[(results.run_id .== run_id) .& (results.p .== p),:]
 
     results[results.st .!= 0,:time] .= Inf
     results[results.st .!= 0,:iter] .= -1
@@ -111,10 +111,10 @@ function pp(; nb = 10.0, p = 1.5, run_id = 0)
     end
     iters[iters .< 0] .= Inf
 
-    fig = performance_profile(PlotsBackend(), times, labels, title = "CPU time", legend = :bottomright, fontfamily="Computer Modern")
+    fig = performance_profile(PlotsBackend(), times, labels; title = "CPU time", legend = :bottomright, fontfamily="Computer Modern")
     Plots.savefig(fig, "pp_S_time.pdf")
 
-    fig = performance_profile(PlotsBackend(), iters, labels, title = "Outer iterations", legend = :bottomright, fontfamily="Computer Modern")
+    fig = performance_profile(PlotsBackend(), iters, labels; title = "Outer iterations", legend = :bottomright, fontfamily="Computer Modern")
     Plots.savefig(fig, "pp_S_iter.pdf")
 end
 
@@ -149,7 +149,7 @@ function statistics()
         for r in eachrow(rr)
             inc = count(r.sigs .> 1.0)
             num_problems_inc += inc > 0
-            num_inc += sum(log10.(r.sigs))
+            num_inc += sum(log2.(r.sigs))
 #             fig = plot(; title="",
 #                 xlabel="iterations",
 #                 ylabel="",
@@ -168,6 +168,7 @@ function statistics()
     end
 
     # Write tex table
+    decs = ["dec_min";"dec_max";"dec_onlyE"]
     tex = open("statistics.tex", "w")
     write(tex, "\\begin{tabular*}{\\textwidth}{@{\\extracolsep\\fill}l$(repeat('c',3*length(decs)))}\n\\toprule\n")
     for dec in decs
@@ -204,7 +205,7 @@ function statistics()
         name = basename(p.instance)
         fig = plot(; title=name,
             xlabel="iterations",
-            ylabel="times increased",
+            ylabel=latexstring("\\text{number of \$\\sigma\$ increases}"),
             fontfamily="Computer Modern"
         )
         for dec in decs
@@ -212,7 +213,7 @@ function statistics()
             if isempty(rr)
                 continue
             end
-            sigs = log10.(rr.sigs[1])
+            sigs = log2.(rr.sigs[1])
             fig = plot!(1:length(sigs), sigs, label=dec)
             println("Problem $(name), $(dec), times increased: $(sum(sigs))")
         end
@@ -226,7 +227,7 @@ function statistics()
 #             if isempty(rr)
 #                 continue
 #             end
-#             data[p,d] = sum(log10.(rr.sigs[1]))
+#             data[p,d] = sum(log2.(rr.sigs[1]))
 #         end
 #     end
 

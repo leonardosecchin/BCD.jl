@@ -290,8 +290,8 @@ function run_all()
     par.eps = 1e-3
 
     # run_id = 1 to 7: calibrate alpha
-    par.maxit = 100 * 10
-    par.maxfnoimpr = ceil(Int64, par.maxit/2)
+    par.maxit = max(5000, 100 * 10)
+    par.maxfnoimpr = ceil(Int64, par.maxit/5)
     for (run_id, alpha) in enumerate([1e-1; 1e-2; 1e-3; 1e-4; 1e-5; 1e-6; 1e-7])
         par.alpha = alpha
         run_tests(run_id, 10.0, blk_cyclic, dec_min, true, par)
@@ -303,8 +303,8 @@ function run_all()
     # run_id = 0: table, varying nb
     par.alpha = 1e-6
     for nb in [0.5;1.0;5.0;10.0;15.0;20.0]
-        par.maxit = 100 * ceil(Int64, 100 / nb)
-        par.maxfnoimpr = ceil(Int64, par.maxit/2)
+        par.maxit = max(5000, 100 * ceil(Int64, 100 / nb))
+        par.maxfnoimpr = ceil(Int64, par.maxit/5)
         run_tests(0, nb, blk_cyclic, dec_min, false, par)
         run_tests(0, nb, blk_cyclic, dec_max, false, par)
         run_tests(0, nb, blk_cyclic, dec_onlyE, false, par)

@@ -75,33 +75,6 @@ function BenchmarkProfiles.powertick(s::AbstractString)
     return s
 end
 
-# function pp_blk(; nb = 10.0, runs = [0;1], p = 1.5)
-#     results = jld2_read("results.jld2","results")
-#     results = results[(results.nb .== nb) .& (results.p .== p),:]
-#
-#     results[results.st .!= 0,:iter] .= -1
-#
-#     algs = Dict(
-#         0 => "Cyclic",
-#         1 => "Cyclic w/ Metis"
-#     )
-#
-#     labels = String[]
-#     iters = []
-#     for r in runs
-#         if isempty(iters)
-#             iters = Float64.(results[results.run_id .== r,:iter])
-#         else
-#             iters = hcat(iters, Float64.(results[results.run_id .== r,:iter]))
-#         end
-#         push!(labels, algs[r])
-#     end
-#     iters[iters .< 0] .= Inf
-#
-#     fig = performance_profile(PlotsBackend(), iters, labels, title = "Outer iterations", fontfamily="Computer Modern")
-#     Plots.savefig(fig, "pp_blk_iter.pdf")
-# end
-
 function pp(; nb = 10.0, p = 1.5, run_id = 0)
     results = jld2_read("results.jld2","results")
     results = results[(results.run_id .== run_id) .& (results.p .== p),:]
@@ -132,7 +105,7 @@ function pp(; nb = 10.0, p = 1.5, run_id = 0)
     Plots.savefig(fig, "pp_S_iter.pdf")
 end
 
-function statistics()
+function statistics(; figures = false)
     results_all = jld2_read("results.jld2","results")
 
     if !isdir("figures")
@@ -164,16 +137,18 @@ function statistics()
             inc = count(r.sigs .> 1.0)
             num_problems_inc += inc > 0
             num_inc += sum(log2.(r.sigs))
-#             fig = plot(; title="",
-#                 xlabel="iterations",
-#                 ylabel="",
-#                 fontfamily="Computer Modern"
-#             )
-#             ssigs = r.sigs .> 1
-#             sfs = log.((r.fs .- minimum(r.fs) .+ 1.0)) / log(maximum(r.fs))
-#             fig = plot!(1:length(r.sigs), ssigs; label="σ")
-#             fig = plot!(1:length(r.fs), sfs; label="f")
-#             savefig(fig, "figures/run_$(id)_$(dec)_$(basename(r.instance)).pdf")
+            if figures
+                fig = plot(; title="",
+                    xlabel="iterations",
+                    ylabel="",
+                    fontfamily="Computer Modern"
+                )
+                ssigs = r.sigs .> 1
+                sfs = log.((r.fs .- minimum(r.fs) .+ 1.0)) / log(maximum(r.fs))
+                fig = plot!(1:length(r.sigs), ssigs; label="σ")
+                fig = plot!(1:length(r.fs), sfs; label="f")
+                savefig(fig, "figures/run_$(id)_$(dec)_$(basename(r.instance)).pdf")
+            end
         end
         solved = length(rr.st)
         push!(table,
@@ -254,5 +229,5 @@ function statistics()
 #         size = (1600, 600),
 #         bar_width = 0.8
 #     )
-#     savefig(fig, "teste.pdf")
+#     savefig(fig, "bar_plot.pdf")
 end

@@ -26,37 +26,23 @@ function lplsq_table(;
     dec = "dec_min",
     output = "lp-lsq_results"
 )
-    results_all = jld2_read("results.jld2", "results")
-    if isnothing(results_all)
+    results = jld2_read("results.jld2", "results")
+    if isnothing(results)
         return
     end
-    results = results_all[
-        (results_all.run_id .== run_id) .&
-        (results_all.nb .== nb) .&
-        (results_all.dec .== dec)
+    results = results[
+        (results.run_id .== run_id) .&
+        (results.nb .== nb) .&
+        (results.dec .== dec)
     ,:]
 
     tex = open("$(output).tex", "w")
-    write(tex, "\\begin{tabular*}{\\textwidth}{@{\\extracolsep\\fill}lllllllllllll}\n\\toprule\n")
-    write(tex, "& & & \\multicolumn{5}{l}{BCD} & & \\multicolumn{4}{l}{SPG}\\\\ \\midrule\n")
-    write(tex, "Instance & \$(m,n)\$ & & block size & iter & \$f\$ & opt & time (s) & & iter & \$f\$ & opt & time (s)\\\\ \\midrule\n")
+    write(tex, "\\begin{tabular*}{\\textwidth}{@{\\extracolsep\\fill}lcccrrr}\n\\toprule\n")
+    write(tex, "Name & \$(m,n)\$ & block size & iter & \$f\$ & opt & time (s)\\\\ \\midrule\n")
     for r in eachrow(results)
         name = replace(basename(string(r.instance)), "_" => "\\_")
         it = (r.gsupn > 1e-3) ? "\\it " : ""
-
-        write(tex, "\\texttt{$(name)} & ($(fmt_d(r.size[1])); $(fmt_d(r.size[2])))")
-
-        # BCD
-        write(tex, " & & $(fmt_lf1(nb*r.size[2]/100)) & $(it)$(fmt_d(r.iter)) & $(it)$(fmt_etex(r.f)) & $(it)$(fmt_etex(r.gsupn)) & $(it)$(fmt_lf(r.time))")
-
-        # SPG
-        rspg = results_all[(results_all.run_id .== -1) .& (results_all.instance .== r.instance),:]
-        if !isempty(rspg)
-            it = (rspg.gsupn[1] > 1e-3) ? "\\it " : ""
-            write(tex, " & & $(it)$(fmt_d(rspg.iter[1])) & $(it)$(fmt_etex(rspg.f[1])) & $(it)$(fmt_etex(rspg.gsupn[1])) & $(it)$(fmt_lf(rspg.time[1]))")
-        end
-
-        write(tex, " \\\\ \n")
+        write(tex, "\\texttt{$(name)} & ($(fmt_d(r.size[1])); $(fmt_d(r.size[2]))) & $(fmt_lf1(nb*r.size[2]/100)) & $(it)$(fmt_d(r.iter)) & $(it)$(fmt_etex(r.f)) & $(it)$(fmt_etex(r.gsupn)) & $(it)$(fmt_lf(r.time)) \\\\ \n")
     end
     write(tex, "\\bottomrule\n\\end{tabular*}")
     close(tex)

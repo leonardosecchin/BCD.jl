@@ -8,6 +8,8 @@ using Random
 using DataFrames
 using JLD2
 using MatrixDepot
+using SPGBox
+using BenchmarkTools
 
 include("jld2_read.jl")
 include("results.jl")
@@ -86,7 +88,8 @@ end
 function solve(
     A, b, q, user_blk, user_dec, hist, par;
     p = 1.5,
-    verbose = 1
+    verbose = 1,
+    benchmark = false
 )
     @assert length(b) == size(A,1) "Dimensions mismatch"
 
@@ -181,10 +184,67 @@ function solve(
         verbose = verbose
     )
 
+    if benchmark
+        time = @belapsed begin bcd(
+            $blocks, $f, $g!, $B, $data_initialize;
+            par = $par,
+            user_blk = $user_blk,
+            user_dec = $user_dec,
+            user_callback = $hist ? $callback : nothing,
+            verbose = $verbose
+        )
+        end samples = 100 seconds = 10.0 evals = 1 gcsample = false gctrial = true
+    end
+
     return output, fs, sigs, opts, time
 end
 
-function run_tests(run_id, nb, user_blk, user_dec, hist, par; p = 1.5)
+function solve_spg(A, b, par; p = 1.5, verbose = 1, benchmark = false)
+    Axb = deepcopy(b)
+
+    # f(x) = 1/p |Ax - b|_p^p
+    function f(x)
+        @views Axb .= A*x .- b
+        return (1/p) * norm(Axb, p)^p
+    end
+
+    # gradient
+    function g!(g, x)
+        g .= transpose(A) * (abs.(Axb).^(p-1) .* sign.(Axb))
+    end
+
+    time = @elapsed begin
+        x = zeros(size(A,2))
+        output = spgbox!(
+            f, g!, x,
+            iprint = verbose,
+            project_x0 = false,
+            nitmax = par.maxit,
+            nfevalmax = 10^9,
+            eps = par.eps
+        )
+    end
+
+    if benchmark
+        time = @belapsed begin
+            x = zeros(size($A,2))
+            spgbox!(
+                $f, $g!, x,
+                iprint = $verbose,
+                project_x0 = false,
+                nitmax = $par.maxit,
+                nfevalmax = 10^9,
+                eps = $par.eps
+            )
+        end samples = 100 seconds = 10.0 evals = 1 gcsample = false gctrial = true
+    end
+
+    return output, time
+end
+
+function run_tests(
+    run_id, nb, user_blk, user_dec, hist, par; p = 1.5, benchmark = false
+)
 
     outfile = "results.jld2"
 
@@ -248,37 +308,86 @@ function run_tests(run_id, nb, user_blk, user_dec, hist, par; p = 1.5)
         end
         println()
 
-        try
-            out, fs, sigs, opts, time = solve(
-                P.A, P.b, q, user_blk, user_dec, hist, par;
-                verbose = 0
-            )
+        if run_id == -1
 
-            row = [
-                run_id;
-                P.name;
-                size(P.A);
-                nb;
-                q;
-                p;
-                String(nameof(user_blk));
-                String(nameof(user_dec));
-                out.f;
-                out.opt;
-                out.status;
-                out.iter;
-                time;
-                out;
-                [fs];
-                [sigs];
-                [opts];
-                par.alpha
-            ]
-            push!(results, (row))
+            # SPG
+            try
+                out, time = solve_spg(
+                    P.A, P.b, par; verbose = 0, benchmark = benchmark
+                )
 
-            jldsave(outfile; results)
-        catch err
-            println("ERROR while solving $(P.name)")
+                row = [
+                    -1;
+                    P.name;
+                    size(P.A);
+                    100;
+                    1;
+                    p;
+                    "none";
+                    "none";
+                    out.f;
+                    out.gnorm;
+                    (out.gnorm <= par.eps) ? 0 : 1;
+                    out.nit;
+                    time;
+                    IterInfo(
+                        out.nit,
+                        (out.gnorm <= par.eps) ? 0 : 1,
+                        out.x,
+                        out.f,
+                        0.0,
+                        out.gnorm,
+                        out.nfeval,
+                        out.nit,
+                        0
+                    );
+                    [[]];
+                    [[]];
+                    [[]];
+                    0.0
+                ]
+                push!(results, (row))
+
+                jldsave(outfile; results)
+            catch err
+                println("ERROR while solving $(P.name) by SPG")
+            end
+
+        else
+
+            # BCD
+            try
+                out, fs, sigs, opts, time = solve(
+                    P.A, P.b, q, user_blk, user_dec, hist, par;
+                    verbose = 0, benchmark = benchmark
+                )
+
+                row = [
+                    run_id;
+                    P.name;
+                    size(P.A);
+                    nb;
+                    q;
+                    p;
+                    String(nameof(user_blk));
+                    String(nameof(user_dec));
+                    out.f;
+                    out.opt;
+                    out.status;
+                    out.iter;
+                    time;
+                    out;
+                    [fs];
+                    [sigs];
+                    [opts];
+                    par.alpha
+                ]
+                push!(results, (row))
+
+                jldsave(outfile; results)
+            catch err
+                println("ERROR while solving $(P.name) by BCD")
+            end
         end
     end
 end
@@ -297,7 +406,7 @@ function run_all()
         run_tests(run_id, 10.0, blk_cyclic, dec_min, true, par)
         run_tests(run_id, 10.0, blk_cyclic, dec_max, true, par)
         run_tests(run_id, 10.0, blk_cyclic, dec_onlyE, true, par)
-        run_tests(run_id, 10.0, blk_cyclic, dec_onlyS, true, par)
+        #run_tests(run_id, 10.0, blk_cyclic, dec_onlyS, true, par)
     end
 
     # run_id = 0: table, varying nb
@@ -305,11 +414,15 @@ function run_all()
     for nb in [0.5;1.0;5.0;10.0;15.0;20.0]
         par.maxit = max(5000, 100 * ceil(Int64, 100 / nb))
         par.maxfnoimpr = ceil(Int64, par.maxit/5)
-        run_tests(0, nb, blk_cyclic, dec_min, false, par)
-        run_tests(0, nb, blk_cyclic, dec_max, false, par)
-        run_tests(0, nb, blk_cyclic, dec_onlyE, false, par)
-        run_tests(0, nb, blk_cyclic, dec_onlyS, false, par)
+        run_tests(0, nb, blk_cyclic, dec_min, false, par, benchmark = true)
+        #run_tests(0, nb, blk_cyclic, dec_max, false, par)
+        #run_tests(0, nb, blk_cyclic, dec_onlyE, false, par)
+        #run_tests(0, nb, blk_cyclic, dec_onlyS, false, par)
     end
+
+    # run_id = -1: SPG
+    par.maxit = 5000
+    run_tests(-1, 100, blk_cyclic, dec_min, false, par, benchmark = true)
 
     # Results
     println("Compiling results...")
